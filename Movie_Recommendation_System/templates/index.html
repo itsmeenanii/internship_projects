@@ -1,1 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CineMatch — AI Movie Recommender</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0e0e12; --surface: #17171e; --surface2: #1f1f28;
+      --border: rgba(255,255,255,0.08); --border-hover: rgba(255,255,255,0.16);
+      --accent: #a78bfa; --accent2: #34d399;
+      --text: #f1f0f5; --muted: #8b8a9a; --star: #fbbf24;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; padding: 2rem 1rem; }
+    h1, h2, h3, .section-label { font-family: 'Syne', sans-serif; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.02em; background: linear-gradient(135deg, #a78bfa 0%, #34d399 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    header p { color: var(--muted); font-size: 0.95rem; margin-top: 0.4rem; }
+    .ai-badge { display: inline-block; background: rgba(167,139,250,0.15); color: var(--accent); border: 1px solid rgba(167,139,250,0.3); border-radius: 20px; font-size: 0.75rem; padding: 4px 14px; margin-top: 0.6rem; font-family: 'Syne', sans-serif; letter-spacing: 0.05em; }
+    .container { max-width: 940px; margin: 0 auto; }
+    .tabs { display: flex; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px; margin-bottom: 2rem; overflow-x: auto; }
+    .tab { flex: 1; padding: 10px 16px; border: none; border-radius: 10px; background: transparent; cursor: pointer; font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 500; color: var(--muted); transition: all 0.2s; white-space: nowrap; }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab.active { background: linear-gradient(135deg, rgba(167,139,250,0.2), rgba(52,211,153,0.15)); color: var(--text); border: 1px solid rgba(167,139,250,0.35); }
+    .section { display: none; }
+    .section.active { display: block; }
+    .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem; text-align: center; }
+    .stat-num { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+    .movie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+    .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; cursor: pointer; transition: border-color 0.2s, transform 0.15s; position: relative; }
+    .movie-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+    .movie-card.selected { border-color: var(--accent); background: rgba(167,139,250,0.06); }
+    .movie-card.selected::after { content: '✓'; position: absolute; top: 8px; right: 10px; font-size: 11px; color: var(--accent); font-weight: 700; }
+    .movie-emoji { font-size: 2rem; margin-bottom: 0.6rem; display: block; }
+    .movie-title { font-size: 0.82rem; font-weight: 500; margin-bottom: 4px; line-height: 1.3; }
+    .movie-meta { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; }
+    .stars { display: flex; gap: 2px; }
+    .star { font-size: 18px; cursor: pointer; color: #3a3a4a; transition: color 0.1s; user-select: none; }
+    .star.filled { color: var(--star); }
+    .star:hover { color: var(--star); }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
+    .genre-btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: 20px; background: transparent; cursor: pointer; font-size: 0.82rem; color: var(--muted); transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+    .genre-btn:hover { border-color: var(--border-hover); color: var(--text); }
+    .genre-btn.active { background: rgba(167,139,250,0.15); color: var(--accent); border-color: rgba(167,139,250,0.5); font-weight: 500; }
+    .rec-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; transition: border-color 0.2s; }
+    .rec-card:hover { border-color: var(--border-hover); }
+    .rec-icon { width: 46px; height: 46px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .rec-title { font-size: 0.9rem; font-weight: 500; }
+    .rec-reason { font-size: 0.75rem; color: var(--muted); margin-top: 3px; }
+    .match-bar-bg { height: 3px; background: var(--surface2); border-radius: 2px; margin-top: 7px; }
+    .match-bar { height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s ease; }
+    .badge { display: inline-block; font-size: 0.68rem; padding: 2px 9px; border-radius: 20px; font-weight: 500; margin-right: 4px; }
+    .badge-score { background: rgba(167,139,250,0.15); color: var(--accent); }
+    .badge-genre { background: rgba(52,211,153,0.12); color: var(--accent2); }
+    .badge-cf { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .badge-cb { background: rgba(52,211,153,0.12); color: var(--accent2); }
+    .section-label { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 1rem; font-family: 'Syne', sans-serif; }
+    .action-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; margin-top: 1rem; border: 1px solid var(--border); border-radius: 12px; background: transparent; color: var(--text); cursor: pointer; font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
+    .action-btn:hover { background: var(--surface2); border-color: var(--border-hover); }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 0.9rem; }
+    .empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; opacity: 0.4; }
+    .weight-row { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; flex-wrap: wrap; }
+    .weight-row label { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .weight-row input[type=range] { flex: 1; min-width: 100px; accent-color: var(--accent); }
+    .weight-val { font-size: 0.82rem; font-weight: 500; color: var(--accent); min-width: 32px; text-align: right; }
+    .algo-note { background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.2); border-radius: 12px; padding: 1rem 1.25rem; font-size: 0.8rem; color: var(--muted); margin-top: 1.5rem; line-height: 1.7; }
+    .algo-note strong { color: var(--accent); font-weight: 500; }
+    .loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 2.5rem; color: var(--muted); font-size: 0.9rem; }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .score-breakdown { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+    .similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .similar-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.9rem; }
+    .sim-bar-bg { height: 3px; background: var(--surface2); border-radius: 2px; margin-top: 8px; }
+    .sim-bar { height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    @media (max-width: 500px) { .movie-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🎬 CineMatch</h1>
+    <p>Rate movies — our AI finds your next favourite</p>
+    <span class="ai-badge">⚡ Powered by Python AI Backend</span>
+  </header>
 
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('rate')">⭐ Rate Movies</button>
+    <button class="tab" onclick="switchTab('genre')">🎭 Browse Genre</button>
+    <button class="tab" onclick="switchTab('recs')">✨ AI Recommendations</button>
+    <button class="tab" onclick="switchTab('similar')">🔍 Similar Movies</button>
+  </div>
+
+  <!-- RATE MOVIES -->
+  <div id="tab-rate" class="section active">
+    <p class="section-label">RATE MOVIES YOU'VE SEEN — THE AI LEARNS FROM YOUR TASTE</p>
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-num" id="stat-rated">0</div><div class="stat-label">Rated</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-avg">—</div><div class="stat-label">Avg rating</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-genre">—</div><div class="stat-label">Top genre</div></div>
+    </div>
+    <div class="movie-grid" id="rate-grid"></div>
+    <button class="action-btn" onclick="switchTab('recs')">✨ Get AI Recommendations →</button>
+  </div>
+
+  <!-- BROWSE GENRE -->
+  <div id="tab-genre" class="section">
+    <p class="section-label">CONTENT-BASED FILTERING — BROWSE BY GENRE</p>
+    <div class="filter-row" id="genre-filters"></div>
+    <div id="genre-results"></div>
+  </div>
+
+  <!-- AI RECOMMENDATIONS -->
+  <div id="tab-recs" class="section">
+    <div class="weight-row">
+      <label>🤝 Collaborative</label>
+      <input type="range" min="0" max="100" value="60" id="cf-slider" oninput="updateWeights(this.value)"/>
+      <span class="weight-val" id="cf-val">60%</span>
+      <label style="margin-left:8px">🎭 Content-based</label>
+      <span class="weight-val" id="cb-val">40%</span>
+    </div>
+    <div id="recs-container"></div>
+  </div>
+
+  <!-- SIMILAR MOVIES -->
+  <div id="tab-similar" class="section">
+    <p class="section-label">FIND MOVIES SIMILAR TO ONE YOU LOVE — COSINE SIMILARITY</p>
+    <div class="filter-row" id="movie-select-row"></div>
+    <div id="similar-results"></div>
+  </div>
+</div>
+
+<script>
+  const MOVIES = {{ movies_json | safe }};
+  const allGenres = [...new Set(Object.values(MOVIES).flatMap(m => m.genres))].sort();
+  let ratings = {};
+  let selectedGenres = new Set();
+  let cfWeight = 0.6;
+  let selectedMovieId = null;
+
+  // ── Tab Switching ──
+  const tabNames = ['rate','genre','recs','similar'];
+  function switchTab(tab) {
+    tabNames.forEach((t,i) => {
+      document.querySelectorAll('.tab')[i].classList.toggle('active', t === tab);
+      const el = document.getElementById('tab-'+t);
+      el.classList.toggle('active', t === tab);
+      el.style.display = t === tab ? 'block' : 'none';
+    });
+    if (tab === 'recs')    fetchRecs();
+    if (tab === 'genre')   renderGenreResults();
+    if (tab === 'similar') renderMovieSelect();
+  }
+  document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+  document.getElementById('tab-rate').style.display = 'block';
+
+  // ── Stars ──
+  function starsHTML(mid, r) {
+    return [1,2,3,4,5].map(n =>
+      `<span class="star ${r>=n?'filled':''}"
+        onclick="rate(${mid},${n})"
+        onmouseover="previewStars(${mid},${n})"
+        onmouseout="resetStars(${mid})">★</span>`
+    ).join('');
+  }
+  function rate(mid, stars) {
+    ratings[mid] = stars;
+    document.getElementById('stars-'+mid).innerHTML = starsHTML(mid, stars);
+    document.getElementById('card-'+mid).classList.add('selected');
+    updateStats();
+  }
+  function previewStars(mid, n) {
+    document.getElementById('stars-'+mid).querySelectorAll('.star').forEach((s,i) => s.classList.toggle('filled', i<n));
+  }
+  function resetStars(mid) {
+    document.getElementById('stars-'+mid).innerHTML = starsHTML(mid, ratings[mid]||0);
+  }
+
+  // ── Stats bar ──
+  function updateStats() {
+    const ids = Object.keys(ratings).map(Number);
+    document.getElementById('stat-rated').textContent = ids.length;
+    if (!ids.length) return;
+    const avg = ids.reduce((s,id)=>s+ratings[id],0)/ids.length;
+    document.getElementById('stat-avg').textContent = avg.toFixed(1)+'★';
+    const gc={};
+    ids.filter(id=>ratings[id]>=4).forEach(id=>MOVIES[id].genres.forEach(g=>gc[g]=(gc[g]||0)+1));
+    const top = Object.entries(gc).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('stat-genre').textContent = top ? top[0] : '—';
+  }
+
+  // ── Rate Grid ──
+  function renderRateGrid() {
+    document.getElementById('rate-grid').innerHTML = Object.entries(MOVIES).map(([id,m]) => `
+      <div class="movie-card" id="card-${id}">
+        <span class="movie-emoji">${m.emoji}</span>
+        <div class="movie-title">${m.title}</div>
+        <div class="movie-meta">${m.genres.join(' · ')} · ${m.year}</div>
+        <div class="stars" id="stars-${id}">${starsHTML(id, 0)}</div>
+      </div>`).join('');
+  }
+
+  // ── Genre Browse ──
+  function renderGenreFilters() {
+    document.getElementById('genre-filters').innerHTML = allGenres.map(g =>
+      `<button class="genre-btn" onclick="toggleGenre('${g}',this)">${g}</button>`
+    ).join('');
+  }
+  function toggleGenre(g, btn) {
+    selectedGenres.has(g) ? selectedGenres.delete(g) : selectedGenres.add(g);
+    btn.classList.toggle('active');
+    renderGenreResults();
+  }
+  function renderGenreResults() {
+    const c = document.getElementById('genre-results');
+    if (!selectedGenres.size) { c.innerHTML='<div class="empty-state"><span class="icon">🎭</span>Select genres above to browse</div>'; return; }
+    const filtered = Object.entries(MOVIES).filter(([,m])=>m.genres.some(g=>selectedGenres.has(g)));
+    c.innerHTML = filtered.map(([id,m]) => `
+      <div class="rec-card">
+        <div class="rec-icon">${m.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div class="rec-title">${m.title} <span style="color:var(--muted);font-weight:400;font-size:0.75rem">${m.year}</span></div>
+          <div style="margin-top:5px">${m.genres.map(g=>`<span class="badge badge-genre">${g}</span>`).join('')}</div>
+        </div>
+        <div class="stars" id="gstars-${id}">${starsHTML(id,ratings[id]||0)}</div>
+      </div>`).join('');
+  }
+
+  // ── Weight Slider ──
+  function updateWeights(val) {
+    cfWeight = val/100;
+    document.getElementById('cf-val').textContent = val+'%';
+    document.getElementById('cb-val').textContent = (100-val)+'%';
+    fetchRecs();
+  }
+
+  // ── Fetch Recommendations from Python backend ──
+  async function fetchRecs() {
+    const c = document.getElementById('recs-container');
+    const ratedCount = Object.keys(ratings).length;
+    if (!ratedCount) {
+      c.innerHTML='<div class="empty-state"><span class="icon">⭐</span><strong style="color:var(--text);display:block;margin-bottom:6px">No ratings yet</strong>Go to "Rate Movies" tab and rate some movies first.</div>';
+      return;
+    }
+    c.innerHTML='<div class="loading"><div class="spinner"></div>Python AI is analysing your taste…</div>';
+    try {
+      const res = await fetch('/api/recommend', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ ratings, cf_weight: cfWeight, cb_weight: 1-cfWeight, top_n: 6 })
+      });
+      const data = await res.json();
+      if (data.error) { c.innerHTML=`<div class="empty-state">${data.error}</div>`; return; }
+
+      const likedGenres = [...new Set(
+        Object.keys(ratings).filter(id=>ratings[id]>=4).flatMap(id=>MOVIES[id]?.genres||[])
+      )];
+
+      c.innerHTML = `
+        <p class="section-label">PYTHON AI BACKEND — ${ratedCount} RATING${ratedCount>1?'S':''} ANALYSED · HYBRID ALGORITHM</p>
+        ${data.recommendations.map(r => {
+          const pct = Math.round(r.hybrid_score * 100);
+          const matchGenres = r.genres.split(', ').filter(g=>likedGenres.includes(g));
+          const reason = matchGenres.length ? `Matches your taste in ${matchGenres.join(' & ')}` : 'Loved by users with similar ratings';
+          return `
+          <div class="rec-card">
+            <div class="rec-icon">${MOVIES[r.movie_id]?.emoji||'🎬'}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span class="rec-title">${r.title}</span>
+                <span class="badge badge-score">${pct}% match</span>
+              </div>
+              <div class="rec-reason">${reason} · ${MOVIES[r.movie_id]?.year||''}</div>
+              <div class="score-breakdown">
+                <span class="badge badge-cf">CF ${(r.cf_score*100).toFixed(0)}%</span>
+                <span class="badge badge-cb">CB ${(r.cb_score*100).toFixed(1)}%</span>
+              </div>
+              <div class="match-bar-bg"><div class="match-bar" style="width:${pct}%"></div></div>
+            </div>
+          </div>`;
+        }).join('')}
+        <div class="algo-note">
+          <strong>How it works:</strong> Your ratings are sent to a <strong>Flask Python backend</strong> running
+          real <strong>cosine similarity</strong> on a user-rating matrix (collaborative filtering) and
+          <strong>genre one-hot vectors</strong> (content-based filtering). Both scores are normalised to [0,1]
+          and blended with the weights above. Drag the slider to change the algorithm balance live.
+        </div>`;
+    } catch(e) {
+      c.innerHTML='<div class="empty-state"><span class="icon">⚠️</span>Could not reach the AI backend.<br>Make sure app.py is running on port 5000.</div>';
+    }
+  }
+
+  // ── Similar Movies ──
+  function renderMovieSelect() {
+    document.getElementById('movie-select-row').innerHTML = Object.entries(MOVIES).map(([id,m]) =>
+      `<button class="genre-btn ${selectedMovieId==id?'active':''}" onclick="selectMovie(${id},this)">${m.emoji} ${m.title}</button>`
+    ).join('');
+    if (selectedMovieId) fetchSimilar(selectedMovieId);
+    else document.getElementById('similar-results').innerHTML='<div class="empty-state"><span class="icon">🔍</span>Pick a movie above to find similar ones</div>';
+  }
+  function selectMovie(id, btn) {
+    selectedMovieId = id;
+    document.querySelectorAll('#movie-select-row .genre-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    fetchSimilar(id);
+  }
+  async function fetchSimilar(id) {
+    const c = document.getElementById('similar-results');
+    c.innerHTML='<div class="loading"><div class="spinner"></div>Computing cosine similarity…</div>';
+    try {
+      const res = await fetch(`/api/similar/${id}`);
+      const data = await res.json();
+      c.innerHTML = `
+        <p class="section-label" style="margin-top:1rem">MOVIES SIMILAR TO "${MOVIES[id].title.toUpperCase()}" — CONTENT-BASED COSINE SIMILARITY</p>
+        <div class="similar-grid">
+          ${data.similar.map(s=>`
+            <div class="similar-card">
+              <div style="font-size:1.6rem;margin-bottom:6px">${MOVIES[s.movie_id]?.emoji||'🎬'}</div>
+              <div class="rec-title">${s.title}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:3px">${s.genres}</div>
+              <div style="font-size:0.72rem;color:var(--accent);margin-top:5px">${Math.round(s.similarity*100)}% similar</div>
+              <div class="sim-bar-bg"><div class="sim-bar" style="width:${Math.round(s.similarity*100)}%"></div></div>
+            </div>`).join('')}
+        </div>`;
+    } catch(e) {
+      c.innerHTML='<div class="empty-state">Could not reach the AI backend.</div>';
+    }
+  }
+
+  // ── Init ──
+  renderRateGrid();
+  renderGenreFilters();
+  renderGenreResults();
+</script>
+</body>
+</html>
