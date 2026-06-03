@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -7,7 +8,8 @@ from sklearn.metrics import classification_report, accuracy_score
 import joblib
 
 # ---------- LOAD DATASET ----------
-data = pd.read_csv("spam_dataset.csv")  # columns: 'text', 'label'
+# Make sure you have spam_dataset.csv with columns: 'text', 'label'
+data = pd.read_csv("spam_dataset.csv")
 
 # ---------- FEATURE EXTRACTION ----------
 vectorizer = TfidfVectorizer(stop_words="english")
@@ -38,9 +40,14 @@ print("Accuracy:", accuracy_score(y_test, svm_preds))
 print(classification_report(y_test, svm_preds))
 
 # ---------- SAVE MODELS ----------
+# Ensure 'models' folder exists
+os.makedirs("models", exist_ok=True)
+
 joblib.dump(nb_model, "models/spam_nb_model.pkl")
 joblib.dump(svm_model, "models/spam_svm_model.pkl")
 joblib.dump(vectorizer, "models/vectorizer.pkl")
+
+print("\n✅ Models saved successfully in 'models/' folder.")
 
 # ---------- PREDICTION EXAMPLE ----------
 sample_email = ["Congratulations! You won a lottery. Click here to claim."]
